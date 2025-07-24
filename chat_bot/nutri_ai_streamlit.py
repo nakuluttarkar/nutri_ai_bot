@@ -143,7 +143,19 @@ with tab5:
             st.markdown("**🤖 NutriAI:**")
             if isinstance(msg, dict):
                 st.markdown(msg.get("message", ""))
-                st.json(msg.get("result", {}))
+
+                result = msg.get("result", {})
+                if isinstance(result, list) and all("first_name" in doc for doc in result):
+                    for doc in result:
+                        st.markdown(f"""
+                        **👩‍⚕️ Dr. {doc.get('first_name', '')} {doc.get('last_name', '')}**
+                        - 📍 Location: {user_query}
+                        - 📞 Phone: {doc.get('phone_numbers')}
+                        - 📧 Email: {doc.get('email_addresses')}
+                        - 🧑 Gender: {doc.get('gender')}
+                        """)
+                else:
+                    st.json(result)
             else:
                 st.markdown(msg)
 

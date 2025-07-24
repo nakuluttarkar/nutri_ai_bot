@@ -80,10 +80,16 @@ async def rate_nutrition_label(image: UploadFile, user_query):
     return {"response": response.choices[0].message.content}
 
 
-async def get_recipes(age_months: int, allergies: str | None):
-    prompt = f"Suggest healthy food recipes for a {age_months}-month-old baby."
+async def get_recipes(age_months: int, allergies: str | None, illness: str | None):
+    prompt = f"Suggest nutritious food recipes for a {age_months}-month-old baby."
+
+    if illness:
+        prompt += f" The baby is currently experiencing '{illness}', so recipes should be gentle, easy to digest, and support recovery. Include medicinal or symptom-relief ingredients if suitable."
+
     if allergies:
-        prompt += f" Avoid foods with: {allergies}."
+        prompt += f" Avoid any recipes containing: {allergies}."
+
+    prompt += " Recipes should be easy to prepare at home, and suitable for a baby's digestion and nutritional needs."
 
     response = client.chat.completions.create(
         model="gpt-4o",
