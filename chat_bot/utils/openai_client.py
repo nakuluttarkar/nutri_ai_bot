@@ -57,10 +57,7 @@ async def analyze_food_image(image: UploadFile, user_query):
     return {"response": response.choices[0].message.content}
 
 
-async def rate_nutrition_label(image: UploadFile, user_query):
-    image_data = await image.read()
-    base64_image = base64.b64encode(image_data).decode()
-    user_base_prompt = ""
+async def rate_nutrition_label(image_base64, user_query):
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -72,7 +69,7 @@ async def rate_nutrition_label(image: UploadFile, user_query):
                 "role": "user",
                 "content": [
                     {"type": "text", "text": user_query or "Analyze this baby food label."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
                 ]
             }
         ]

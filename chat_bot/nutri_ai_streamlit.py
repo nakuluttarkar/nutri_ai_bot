@@ -6,13 +6,19 @@ from agents.nutri_ai_agent import run_agent
 import base64
 import os
 from openai import OpenAI
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Change to INFO to reduce noise
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 API_URL = "http://localhost:8000"
 
 st.set_page_config(page_title="NutriAI - Baby Health Assistant", page_icon="👶")
 st.title("👶 NutriAI - Baby Health Assistant")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📷 Analyze Food", "📦 Rate Label", "🍲 Baby Recipes", "👩‍⚕️ Pediatricians", "ChatBot"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📷 Analyze Food", "📦 Rate Label", "🍲 Baby Recipes", "👩‍⚕️ Pediatricians", "ChatBot", "testChatBot"])
 
 with tab1:
     st.header("📷 Upload Food Image")
@@ -56,19 +62,16 @@ with tab5:
     uploaded_image = st.file_uploader("Upload image (food or label)", type=["jpg", "jpeg", "png"])
 
     if st.button("Send"):
-        if uploaded_image:
-            data = {
-                "user_query": user_query  # Make sure it's NOT a stringified JSON here
-            }
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Handle image upload
+        if uploaded_image:
             image_bytes = uploaded_image.read()
             base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-            # Step 1: Ask GPT-4o to classify the image
             classification_prompt = (
-                "Is this image a picture of cooked baby food item, or is it a nutrition label or ingrediant list of a packed food? "
-                "Respond with one word: either 'food' or 'label'."
+                "Is this image a picture of cooked baby food or a nutrition label? "
+                "Reply with only one word: 'food' or 'label'."
             )
 
             vision_response = client.chat.completions.create(
@@ -92,70 +95,71 @@ with tab5:
 
             image_type = vision_response.choices[0].message.content.strip().lower()
 
-            # Step 2: Route to correct API
-            st.session_state.chat_history.append(("user", user_query or "[Image uploaded]"))
+            # Append user message to history
+            st.session_state.chat_history.append({"role": "user", "content": user_query or "[Uploaded Image]"})
 
-            if image_type == "food":
-                res = requests.post(f"{API_URL}/analyze-food/", files={"image": image_bytes}, data=data)
-                print(res)
-                try:
-                    json_data = res.json()
-                    st.session_state.chat_history.append(("bot", {
-                        "message": "This looks like a cooked food. Analysing it...",
-                        "result": json_data
-                    }))
-                except Exception as e:
-                    st.session_state.chat_history.append(("bot", {
-                        "message": f"❌ Error decoding JSON response: {e}",
-                        "status_code": res.status_code,
-                        "text": res.text
-                    }))
+            try:
+                # Route to appropriate backend based on classification
+                if image_type == "food":
+                    res = requests.post(
+                        f"{API_URL}/analyze-food/",
+                        files={"image": image_bytes},
+                        data={"user_query": user_query or ""}
+                    )
+                    data = res.json()
+                    st.markdown("**🤖 NutriAI:**")
+                    # st.markdown("📊 This looks like cooked baby food. Analyzing nutrients...")
+                    st.json(data)
 
-            elif image_type == "label":
-                res = requests.post(f"{API_URL}/rate-label/", files={"image": image_bytes}, data=data)
-                print(res)
-                try:
-                    json_data = res.json()
-                    st.session_state.chat_history.append(("bot", {
-                        "message": "This looks like a nutrition label. Rating it...",
-                        "result": json_data
-                    }))
-                except Exception as e:
-                    st.session_state.chat_history.append(("bot", {
-                        "message": f"❌ Error decoding JSON response: {e}",
-                        "status_code": res.status_code,
-                        "text": res.text
-                    }))
+                elif image_type == "label":
+                    res = requests.post(
+                        f"{API_URL}/rate-label/",
+                        files={"image": image_bytes},
+                        data={"user_query": user_query or ""}
+                    )
+                    data = res.json()
+                    st.markdown("**🤖 NutriAI:**")
+                    # st.markdown("📊 This looks like cooked baby food. Analyzing nutrients...")
+                    st.json(data)
 
-            else:
-                st.session_state.chat_history.append(("bot", f"Couldn't confidently classify the image. LLM said: {image_type}"))
-
-        elif user_query:
-            st.session_state.chat_history.append(("user", user_query))
-            reply = run_agent(user_query)  # still supports text-based queries
-            st.session_state.chat_history.append(("bot", reply))
-
-    # Show conversation
-    for role, msg in st.session_state.chat_history:
-        if role == "user":
-            st.markdown(f"**🧑 You:** {msg}")
-        else:
-            st.markdown("**🤖 NutriAI:**")
-            if isinstance(msg, dict):
-                st.markdown(msg.get("message", ""))
-
-                result = msg.get("result", {})
-                if isinstance(result, list) and all("first_name" in doc for doc in result):
-                    for doc in result:
-                        st.markdown(f"""
-                        **👩‍⚕️ Dr. {doc.get('first_name', '')} {doc.get('last_name', '')}**
-                        - 📍 Location: {user_query}
-                        - 📞 Phone: {doc.get('phone_numbers')}
-                        - 📧 Email: {doc.get('email_addresses')}
-                        - 🧑 Gender: {doc.get('gender')}
-                        """)
                 else:
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": f"🤔 Couldn't confidently classify the image. LLM said: `{image_type}`"
+                    })
+
+            except Exception as e:
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": f"❌ Error during analysis: {e}"
+                })
+
+        elif user_query.strip():
+            # Text-only query
+            try:
+                run_agent(user_query)
+            except Exception as e:
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": f"❌ Error calling agent: {e}"
+                })
+
+    # Render the conversation
+    for msg in st.session_state.chat_history:
+        role = msg.get("role")
+        content = msg.get("content")
+
+        if role == "user":
+            st.markdown(f"**🧑 You:** {content}")
+        elif role == "assistant":
+            st.markdown("**🤖 NutriAI:**")
+            if isinstance(content, dict):
+                if message := content.get("message"):
+                    st.markdown(message)
+                if result := content.get("result"):
                     st.json(result)
             else:
-                st.markdown(msg)
+                st.markdown(content)
+
+
 
