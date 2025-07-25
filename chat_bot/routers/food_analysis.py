@@ -14,6 +14,11 @@ async def analyze_food(
 
     try:
         response = await analyze_food_image(image_base64)
+        raw = response.get("response", "")
+        if raw.startswith("```json"):
+            raw = raw.removeprefix("```json").strip()
+        if raw.endswith("```"):
+            raw = raw.removesuffix("```").strip()
         logger.info("✅ Analysis complete.")
         return JSONResponse(content=response)
     except Exception as e:

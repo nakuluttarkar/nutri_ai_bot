@@ -62,7 +62,7 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
         messages.append({"role": "system", "content": DEFAULT_SYSTEM_PROMPT + f"\nSummary of previous conversation:\n{summary}"})
     else:
         messages.append({"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
-    print(messages, "= Message ")
+    
     # Only re-use safe history (no unfinished tool calls, no tool messages)
     safe_history = strip_unsafe_history(chat_history)
     messages.extend(safe_history)

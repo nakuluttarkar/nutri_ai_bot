@@ -24,9 +24,10 @@ async def analyze_food_image(image_base64: str):
             "Strict JSON Format:\n"
             "{\n"
             "  \"rating\": \"<1-5>\",\n"
-            "  \"estimated_calories\": \"<calories in kcal>\",\n"
+             
             "  \"comment\": \"<short explanation about the rating>\",\n"
             "  \"nutrition_estimates\": {\n"
+            "   \"estimated_calories\": \"<calories in kcal>\",\n"
             "    \"protein\": \"<value in grams>\",\n"
             "    \"carbohydrates\": \"<value in grams>\",\n"
             "    \"fat\": \"<value in grams>\",\n"
@@ -46,7 +47,7 @@ async def analyze_food_image(image_base64: str):
             "role": "user",
             "content": [
                 {"type": "text", "text": "Analyze this baby food image."},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
             ]
         }
     ],

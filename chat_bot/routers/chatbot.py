@@ -16,6 +16,9 @@ from utils.openai_client import rate_nutrition_label, analyze_food_image
 class ChatResponse(BaseModel):
     response: str
 
+class ChatRequest(BaseModel):
+    user_input: str
+
 
 # @router.post("/chat", response_model=ChatResponse)
 # def chat_endpoint(request: ChatRequest):
@@ -41,7 +44,7 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 def chat_endpoint(
     request: Request,
-    user_input: Optional[str] = Form("")
+    data: ChatRequest
    
 ):
     
@@ -55,13 +58,14 @@ def chat_endpoint(
     else:
         chat_history_list = chat_history
 
-    
+    print("User Input = ", data.user_input)
         # No image, process text query with LLM agent
     reply, updated_history, updated_summary = run_agent(
-        user_input, chat_history_list, summary
+        data.user_input, chat_history_list, summary
     )
     request.session["chat_history"] = updated_history
     request.session["chat_summary"] = updated_summary
     reply = re.sub(r"```(?:json)?\s*([\s\S]*?)```", r"\1", reply).strip()
+    print("Reply = ", ChatResponse(response=reply))
 
     return ChatResponse(response=reply)
