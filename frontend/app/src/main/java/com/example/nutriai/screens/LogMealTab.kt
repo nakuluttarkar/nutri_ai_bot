@@ -40,6 +40,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import com.example.nutriai.data.ApiConfig
+import java.util.concurrent.TimeUnit
 
 data class FoodAnalysisResult(
     val rating: Int = 0,
@@ -52,6 +53,16 @@ data class FoodAnalysisResult(
     val fats: Int = 0,
     val fatsTarget: Int = 0
 )
+
+fun stripCodeBlock(jsonStr: String?): String {
+    if (jsonStr == null) return ""
+    // Remove ```json ... ``` or just ``` ... ```
+    return jsonStr
+        .replace(Regex("^```(?:json)?\\s*"), "")  // Remove starting ```
+        .replace(Regex("\\s*```$"), "")           // Remove ending ```
+        .trim()
+}
+
 
 @Composable
 fun EnsureCameraPermission(
@@ -348,6 +359,25 @@ fun LogMealTab(
             Spacer(Modifier.height(12.dp))
             Text("Error: $uploadError", color = Color.Red)
         }
+        if (nutritionSummary.suggestedAlternatives.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text = "Suggestions to improve your meal:",
+                color = Color(0xFFE0004D),
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+            Column {
+                nutritionSummary.suggestedAlternatives.forEach { suggestion ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("• ", color = Color(0xFFE0004D), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(suggestion, color = Color(0xFF222222), fontSize = 15.sp)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+
     }
 
     // Show label result as a dialog/card if present
@@ -361,7 +391,7 @@ fun LogMealTab(
             title = { Text("Nutrition Rating") },
             text = {
                 Column {
-                    Text("Rating: ${safeResult.rating}")
+                    Text("Rating: ${safeResult.rating}/5")
                     Text("Comment: ${safeResult.comment}")
                     safeResult.nutrition_values.let { nv ->
                         Text("Protein: ${nv.protein}")
@@ -459,7 +489,11 @@ suspend fun uploadAndAnalyzeMeal(
         val requestBody = formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType())
 
         // Step 5: Create and send HTTP request
-        val client = OkHttpClient()
+        val client = OkHttpClient.Builder()
+            .connectTimeout(180, TimeUnit.SECONDS)  // Time to establish connection
+            .writeTimeout(180, TimeUnit.SECONDS)    // Time to send request
+            .readTimeout(180, TimeUnit.SECONDS)     // Time to wait for response
+            .build()
         val request = Request.Builder()
             .url(apiUrl)
             .post(requestBody)
@@ -483,12 +517,18 @@ suspend fun uploadAndAnalyzeMeal(
         // Step 7: Parse response
         val outerJson = JSONObject(rawResponse)
         val innerJsonString = outerJson.optString("response", null)
+
         if (innerJsonString == null) {
             Log.d("NUTRI_AI_DEBUG", "No 'response' key in API response")
             return@withContext null
         }
         val innerJson = JSONObject(innerJsonString)
-
+        val alternatives = innerJson.optJSONArray("suggested_alternatives")
+        val suggestedAlternatives = if (alternatives != null) {
+            List(alternatives.length()) { i -> alternatives.getString(i) }
+        } else {
+            emptyList()
+        }
         Log.d("NUTRI_AI_DEBUG", "Parsed innerJson: $innerJson")
 
 
@@ -515,13 +555,15 @@ suspend fun uploadAndAnalyzeMeal(
             carbs = carbs.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
             carbsTarget = 200,
             fats = fat.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
-            fatsTarget = 50
+            fatsTarget = 50,
+            suggestedAlternatives = suggestedAlternatives
         )
     } catch (e: Exception) {
         Log.d("NUTRI_AI_DEBUG", "Exception in uploadAndAnalyzeMeal: ${e.localizedMessage}")
         e.printStackTrace()
         return@withContext null
     }
+
 }
 
 /**
@@ -560,12 +602,13 @@ suspend fun analyzeLabelApi(
         Log.d("NUTRI_AI_DEBUG", "API Raw Response: $rawResponse")
         val outerJson = JSONObject(rawResponse)
         val innerJsonString = outerJson.optString("response", null)
-        Log.d("NUTRI_AI_DEBUG", "Innen Json: $innerJsonString")
+        val cleanedInnerJson = stripCodeBlock(innerJsonString)
+        Log.d("NUTRI_AI_DEBUG", "Innen Json: $cleanedInnerJson")
         if (innerJsonString == null) {
             // handle error
             return@withContext null
         }
-        val resp = JSONObject(innerJsonString)
+        val resp = JSONObject(cleanedInnerJson)
 
         Log.d("NUTRI_AI_DEBUG", "Response: $resp")
         return@withContext NutritionRatingResponse(
@@ -587,4 +630,5 @@ suspend fun analyzeLabelApi(
         e.printStackTrace()
         return@withContext null
     }
+
 }

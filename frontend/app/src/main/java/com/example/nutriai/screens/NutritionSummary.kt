@@ -8,5 +8,6 @@ data class NutritionSummary(
     val carbs: Int,
     val carbsTarget: Int,
     val fats: Int,
-    val fatsTarget: Int
+    val fatsTarget: Int,
+    val suggestedAlternatives: List<String> = emptyList()
 )
