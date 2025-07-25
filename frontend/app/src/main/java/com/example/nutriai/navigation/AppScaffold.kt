@@ -24,7 +24,6 @@ import com.example.nutriai.screens.SubscriptionPlanScreen
 fun AppScaffold(navController: NavHostController) {
     val navItems = listOf(
         BottomNavItem("Meal Tracker", "meal_tracker", Icons.Filled.List),
-        BottomNavItem("Health Hub", "health_hub", Icons.Filled.Favorite),
         BottomNavItem("Nutri Chat", "nutri_chat", Icons.Filled.Chat),
         BottomNavItem("Subscription", "subscription_plan", Icons.Filled.Star)
     )

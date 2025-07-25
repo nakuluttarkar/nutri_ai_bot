@@ -111,7 +111,7 @@ fun NutriChatScreen() {
                             )
                             isLoading = false
                             if (response != null) {
-                                Log.d("NUTRI_CHAT", "Got response: ${response.general_response}")
+                                Log.d("NUTRI_CHAT", "Got response: '${response.general_response}'")
                                 // Append user input and AI response to history
                                 chatHistory = chatHistory +
                                         ChatMessage("user", userInput) +
