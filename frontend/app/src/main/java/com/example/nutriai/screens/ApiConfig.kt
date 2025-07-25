@@ -1,5 +1,5 @@
 package com.example.nutriai.data
 
 object ApiConfig {
-    const val BASE_URL = "https://d98287ac468f.ngrok-free.app/"
+    const val BASE_URL = "http://10.0.2.2:8000/"
 }

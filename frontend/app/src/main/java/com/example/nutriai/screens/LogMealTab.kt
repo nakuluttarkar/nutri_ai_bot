@@ -41,6 +41,18 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.example.nutriai.data.ApiConfig
 
+data class FoodAnalysisResult(
+    val rating: Int = 0,
+    val estimatedCalories: Int = 0,
+    val comment: String = "",
+    val protein: Int = 0,
+    val proteinTarget: Int = 0,
+    val carbs: Int = 0,
+    val carbsTarget: Int = 0,
+    val fats: Int = 0,
+    val fatsTarget: Int = 0
+)
+
 @Composable
 fun EnsureCameraPermission(
     onGranted: () -> Unit,
@@ -420,7 +432,7 @@ suspend fun uploadAndAnalyzeMeal(
         Log.d("NUTRI_AI_DEBUG", "Base64 string created, length: ${imageBase64.length}")
 
         // Step 4: Build request body (form-encoded)
-        val formBody = "$imageBase64"
+        val formBody = "image_base64=${Uri.encode(imageBase64)}"
         val requestBody = formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType())
 
         // Step 5: Create and send HTTP request
@@ -453,7 +465,10 @@ suspend fun uploadAndAnalyzeMeal(
             return@withContext null
         }
         val innerJson = JSONObject(innerJsonString)
+
         Log.d("NUTRI_AI_DEBUG", "Parsed innerJson: $innerJson")
+
+
 
         // Step 8: Parse nutrition values
         val nutritionEstimates = innerJson.optJSONObject("nutrition_estimates")
@@ -462,7 +477,7 @@ suspend fun uploadAndAnalyzeMeal(
             return@withContext null
         }
 
-        val calories = nutritionEstimates.optString("calories")
+        val calories = nutritionEstimates.optString("estimated_calories")
         val protein = nutritionEstimates.optString("protein")
         val carbs = nutritionEstimates.optString("carbohydrates")
         val fat = nutritionEstimates.optString("fat")
@@ -504,7 +519,7 @@ suspend fun analyzeLabelApi(
         } else return@withContext null
 
         // Try without encode if backend expects plain base64:
-        val formBody = "image_base64=$imageBase64"
+        val formBody = "image_base64=${Uri.encode(imageBase64)}"
 
         val requestBody = formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType())
 
