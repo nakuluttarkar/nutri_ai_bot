@@ -65,6 +65,4 @@ dependencies {
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
-    implementation("com.himanshoe:compose-charts:1.0.1")
-
 }

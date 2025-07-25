@@ -15,8 +15,8 @@ fun MealTrackerScreen() {
     var nutritionSummary by remember {
         mutableStateOf(
             NutritionSummary(
-                calories = 1250,
-                caloriesTarget = 1800,
+                calories = 650,
+                caloriesTarget = 800,
                 protein = 60,
                 proteinTarget = 70,
                 carbs = 150,

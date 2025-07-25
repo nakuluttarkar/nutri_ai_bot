@@ -27,79 +27,130 @@ fun NutriChatScreen() {
     var userInput by remember { mutableStateOf("") }
     var chatHistory by remember { mutableStateOf(listOf<ChatMessage>()) }
     var summary by remember { mutableStateOf("") }
-
-    var chatResponse by remember { mutableStateOf<ChatResponse?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        // Input field and send button
-        OutlinedTextField(
-            value = userInput,
-            onValueChange = { userInput = it },
-            label = { Text("Ask Nutri AI...") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = {
-                if (userInput.isNotBlank()) {
-                    isLoading = true
-                    errorText = null
-                    coroutineScope.launch {
-                        val response = sendChatRequest(
-                            userInput = userInput,
-                            chatHistory = chatHistory,
-                            summary = summary,
-                            apiUrl = "http://YOUR_IP_OR_NGROK/chat"
+    // Scroll to bottom when chat updates
+    LaunchedEffect(chatHistory.size) {
+        listState.animateScrollToItem(chatHistory.size)
+    }
+
+    Column(Modifier.fillMaxSize().background(Color(0xFFF7F7F7))) {
+        // Chat area
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp),
+            state = listState,
+            reverseLayout = false,
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            items(chatHistory.size) { idx ->
+                val msg = chatHistory[idx]
+                val isUser = msg.role == "user"
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+                ) {
+                    Surface(
+                        color = if (isUser) Color(0xFF1A6AC7) else Color.White,
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 4.dp,
+                        tonalElevation = 2.dp,
+                        modifier = Modifier.padding(4.dp).widthIn(max = 320.dp)
+                    ) {
+                        Text(
+                            text = msg.content,
+                            color = if (isUser) Color.White else Color.Black,
+                            modifier = Modifier.padding(12.dp),
+                            fontWeight = if (isUser) FontWeight.Normal else FontWeight.Medium
                         )
-                        isLoading = false
-                        if (response != null) {
-                            chatResponse = response
-                            chatHistory = chatHistory + ChatMessage("user", userInput) +
-                                    ChatMessage("assistant", response.general_response)
-                            userInput = ""
-                            summary = response.general_response // Or use your summary logic
-                        } else {
-                            errorText = "Failed to get response!"
-                        }
                     }
                 }
-            },
-            enabled = !isLoading,
-            modifier = Modifier.align(Alignment.End)
+            }
+        }
+
+        // Error or status
+        errorText?.let {
+            Text(it, color = Color.Red, modifier = Modifier.padding(start = 12.dp, bottom = 2.dp))
+        }
+
+        // Input area
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(if (isLoading) "Sending..." else "Send")
-        }
-        Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = userInput,
+                onValueChange = { userInput = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Ask Nutri AI...") },
+                singleLine = true,
+                shape = RoundedCornerShape(22.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = Color(0xFFEEEFFF),
+                    focusedBorderColor = Color(0xFF1A6AC7)
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    if (userInput.isNotBlank()) {
+                        isLoading = true
+                        errorText = null
+                        coroutineScope.launch {
+                            val response = sendChatRequest(
+                                userInput = userInput,
+                                chatHistory = chatHistory,
+                                summary = summary,
+                                apiUrl = com.example.nutriai.data.ApiConfig.BASE_URL + "chat"
+                            )
+                            isLoading = false
+                            if (response != null) {
+                                // Append user input and AI response to history
+                                chatHistory = chatHistory +
+                                        ChatMessage("user", userInput) +
+                                        ChatMessage("assistant", response.general_response)
+                                userInput = ""
+                                summary = response.general_response
 
-        // Display assistant response (always mandatory)
-        chatResponse?.let { resp ->
-            Text("AI: ${resp.general_response}", fontWeight = FontWeight.Bold, color = Color(0xFF1A6AC7))
-            Spacer(Modifier.height(8.dp))
-
-            // Optional recipes
-            resp.recipes?.takeIf { it.isNotEmpty() }?.let { recipes ->
-                Text("Recommended Recipes:", fontWeight = FontWeight.Bold)
-                recipes.forEach { recipe ->
-                    Text("• ${recipe.name}", fontWeight = FontWeight.SemiBold)
-                    Text("  Ingredients: ${recipe.ingredients.joinToString()}")
-                    Text("  Instructions: ${recipe.instructions}")
-                    Spacer(Modifier.height(6.dp))
+                                // Optional: Add recipes and pediatricians as separate messages
+                                response.recipes?.forEach { r ->
+                                    chatHistory = chatHistory + ChatMessage(
+                                        "assistant",
+                                        "🍲 *${r.name}*\nIngredients: ${r.ingredients.joinToString()}\nInstructions: ${r.instructions}"
+                                    )
+                                }
+                                response.pediatricians?.forEach { doc ->
+                                    chatHistory = chatHistory + ChatMessage(
+                                        "assistant",
+                                        "👩‍⚕️ ${doc.name}\nPhone: ${doc.phone}\nEmail: ${doc.email}"
+                                    )
+                                }
+                            } else {
+                                errorText = "Failed to get response!"
+                            }
+                        }
+                    }
+                },
+                enabled = !isLoading && userInput.isNotBlank(),
+                shape = RoundedCornerShape(50),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Send, contentDescription = "Send")
                 }
             }
-            // Optional pediatricians
-            resp.pediatricians?.takeIf { it.isNotEmpty() }?.let { docs ->
-                Text("Pediatricians:", fontWeight = FontWeight.Bold)
-                docs.forEach { doc ->
-                    PediatricianCard(doc)
-                }
-            }
-
         }
-        errorText?.let { Text(it, color = Color.Red) }
     }
 }
+
+// --- You can keep your PediatricianCard for more detailed views, if you want ---
+
 
 @Composable
 fun PediatricianCard(pediatrician: Pediatrician, modifier: Modifier = Modifier) {
