@@ -59,7 +59,6 @@ fun AppScaffold(navController: NavHostController) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("meal_tracker") { MealTrackerScreen() }
-            composable("health_hub") { HealthHubScreen() }
             composable("nutri_chat") { NutriChatScreen() }
             composable("subscription_plan") { SubscriptionPlanScreen() }
         }
