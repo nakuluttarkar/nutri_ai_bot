@@ -4,9 +4,7 @@ from fastapi import UploadFile
 
 client = OpenAI()
 
-async def analyze_food_image(image: UploadFile, user_query):
-    image_data = await image.read()
-    base64_image = base64.b64encode(image_data).decode()
+async def analyze_food_image(image_base64: str, user_query):
 
     response = client.chat.completions.create(
     model="gpt-4o",
@@ -48,7 +46,7 @@ async def analyze_food_image(image: UploadFile, user_query):
             "role": "user",
             "content": [
                 {"type": "text", "text": user_query or "Analyze this baby food image."},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
             ]
         }
     ],
@@ -63,7 +61,7 @@ async def rate_nutrition_label(image_base64, user_query):
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert pediatric nutrition assistant.\n\nYour task is to analyze an image of a nutrition label and ingredients list. Based on the content:\n\n1. Extract important nutrients and their values (e.g., protein, sugar, sodium).\n2. Identify any concerning ingredients or warning signs (e.g., high sugar, preservatives).\n3. Provide a healthiness rating from 1 to 5:\n   - 1 = Very unhealthy\n   - 5 = Very healthy\n4. Explain why you gave this rating, based on the label content.\n5. Always respond strictly in the following JSON format:\n\n{\n  \"rating\": \"<rating from 1 to 5>\",\n  \"comment\": \"<reason for the rating, in 2–3 sentences>\",\n  \"nutrition_values\": {\n    \"protein\": \"<amount>\",\n    \"sugar\": \"<amount>\",\n    \"sodium\": \"<amount>\",\n    \"total_calories\": \"<amount>\"...\n  },\n  \"warnings\": [\"<short warning 1>\", \"<short warning 2>\", ...]\n}\n\nDo not include anything outside of the JSON block."
+                "content": "You are an expert pediatric nutrition assistant.\n\nYour task is to analyze an image of a nutrition label and ingredients list and answer user query. Based on the content:\n\n1. Extract important nutrients and their values (e.g., protein, sugar, sodium).\n2. Identify any concerning ingredients or warning signs (e.g., high sugar, preservatives).\n3. Provide a healthiness rating from 1 to 5:\n   - 1 = Very unhealthy\n   - 5 = Very healthy\n4. Explain why you gave this rating, based on the label content.\n5. Always respond strictly in the following JSON format:\n\n{\n  \"rating\": \"<rating from 1 to 5>\",\n  \"comment\": \"<reason for the rating, in 2–3 sentences>\",\n  \"nutrition_values\": {\n    \"protein\": \"<amount>\",\n    \"sugar\": \"<amount>\",\n    \"sodium\": \"<amount>\",\n    \"total_calories\": \"<amount>\"...\n  },\n  \"warnings\": [\"<short warning 1>\", \"<short warning 2>\", ...]\n}\n\nDo not include anything outside of the JSON block."
             },
             {
                 "role": "user",

@@ -2,13 +2,14 @@ from openai import OpenAI
 from agents.agent_tools import *
 import json
 import logging
+from fastapi import Request
 
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = (
                     "You are NutriAI — a helpful, knowledgeable, and empathetic AI assistant specializing in baby nutrition, health, and wellness.\n\n"
-                    "Your primary job is to assist parents of children aged 0–5 years. You have access to a set of tools that help answer specific queries more accurately.\n\n"
+                    "Your primary job is to assist parents of children aged 0–5 years based in INDONESIA. You have access to a set of tools that help answer specific queries more accurately.\n\n"
                     "🔧 Tool Usage Instructions:\n"
                     "- Use `analyze_food_image` when the user uploads a food image or asks to estimate calories, nutrients, or healthiness of cooked baby food.\n"
                     "- Use `rate_nutrition_label` when the user uploads a nutrition label or asks to rate how healthy a packaged food item is.\n"
@@ -16,14 +17,33 @@ DEFAULT_SYSTEM_PROMPT = (
                     "- Use `get_pediatricians` when the user mentions their baby is unwell, asks for a consultation, or seeks professional medical help.\n\n"
                     "- Additionally, if the user mentions that the baby is unwell, use `get_pediatricians` and `get_baby_recipes` tools to give appropriate answers"
                     "📌 Multi-Tool Scenarios:\n"
-                    "- If the baby is sick (e.g., cold, fever, stomach issues), you can suggest `get_baby_recipes` for soothing or medicinal food, and also `get_pediatricians` to recommend a doctor for consultation.\n"
-                    "- If the user asks about vaccination schedules, provide the schedule from general knowledge, then use `get_pediatricians` to suggest doctors nearby for follow-up.\n"
-                    "- If both an image and a health-related question are provided, use the appropriate image analysis tool **and** follow up with recipes or pediatrician info if relevant.\n\n"
+                    "- If the baby is sick (e.g., has a cold, fever, cough, diarrhea, vomiting, stomach issues, or is feeling unwell in any way), you must use both:\n"
+                    "   → `get_baby_recipes` to suggest age-appropriate, soothing, or healing foods, include symptoms in `illness` parameter\n"
+                    "   → `get_pediatricians` to recommend a qualified pediatrician for medical consultation\n"
+                    "- Always explain your reasoning to the user (e.g., 'Since your baby has a cold, I’m recommending a doctor and some soothing foods.')\n"
+                    "- If the user asks about vaccination schedules, share a general schedule based on medical knowledge, and then use `get_pediatricians` to suggest doctors for follow-up vaccinations.\n"
                     "💬 Response Guidelines:\n"
                     "- Be empathetic and friendly in your tone.\n"
                     "- Clearly explain what you are doing (e.g., 'Based on your baby’s age and illness, here are some suggested recipes...')\n"
                     "- Do not call tools unnecessarily. Only use tools when you need accurate, dynamic, or personalized information.\n"
-                    "- When calling a tool, always explain to the user why you are using it.\n\n"
+                    "- Stay concise, medically responsible, and helpful. Always prioritize the baby’s health and safety in your answers. Preserve context (e.g., baby age, allergies, illness) from earlier messages."
+                    "- STRICTLY ADHERE TO THE FOLLOWING RESPONSE FORMAT:\n"
+                    "- After using tools and/or combining them with your own knowledge, respond in the following **structured JSON format**:\n\n"
+                    "{\n"
+                    "  \"general_response\": \"Short, clear explanation or answer in natural language.\",\n"
+                    "  \"suggestions\": [  // Optional: general health guidance\n"
+                    "    {\"title\": \"Stay Hydrated\", \"description\": \"Give breast milk or formula frequently.\"}\n"
+                    "  ],\n"
+                    "  \"recipes\": [  // Optional: if get_baby_recipes was used\n"
+                    "    {\"name\": \"Banana Mash\", \"ingredients\": [\"banana\"], \"instructions\": \"Mash and serve fresh.\"}\n"
+                    "  ],\n"
+                    "  \"pediatricians\": [  // Optional: if get_pediatricians was used\n"
+                    "    {\"name\": \"Dr. Asha Rao\", \"phone\": \"9876543210\", \"email\": \"asha@example.com\"}\n"
+                    "  ]\n"
+                    "}\n\n"
+                    "- Always include the `general_response`.\n"
+                    "- Omit any other key (`suggestions`, `recipes`, `pediatricians`) if not applicable.\n"
+                    "- Do not include markdown, bullet points, or extra explanations — just return valid JSON.\n\n"
                     "Stay concise, medically responsible, and helpful. Always prioritize the baby’s health and safety in your answers. Preserve context (e.g., baby age, allergies, illness) from earlier messages."
                     )
 
@@ -34,14 +54,15 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
         rate_label_tool(),
         get_pediatricians_tool(),
     ]
-
+    print("Running Agent")
     # Server owns system
+
     messages: list[dict] = []
     if summary:
-        messages.append({"role": "system", "content": f"Summary of previous conversation:\n{summary}"})
+        messages.append({"role": "system", "content": DEFAULT_SYSTEM_PROMPT + f"\nSummary of previous conversation:\n{summary}"})
     else:
         messages.append({"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
-
+    print(messages, "= Message ")
     # Only re-use safe history (no unfinished tool calls, no tool messages)
     safe_history = strip_unsafe_history(chat_history)
     messages.extend(safe_history)
@@ -52,7 +73,7 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
     while True:
         logger.debug("Sending to OpenAI: %s", messages)
         assert_tool_invariants(messages)  # sanity check before the call
-
+        print("Creating AI request to use tools")
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -66,6 +87,7 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
         if message.tool_calls:
             # 1) append the assistant message WITH tool_calls
             messages.append(message.model_dump())
+            print("Tools are called")
 
             # 2) run tools and append tool results
             for tool_call in message.tool_calls:
@@ -83,7 +105,7 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
                         result = call_get_pediatricians()
                     case _:
                         result = f"❌ Unknown tool: {name}"
-
+                print("Messages 2 = ", messages)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
@@ -103,7 +125,7 @@ def run_agent(user_input: str, chat_history: list, summary: str = "") -> tuple[s
             # keep just the last N messages (tune N to what you want)
             recent_history = clean_history[-8:]
 
-            updated_summary = summarize_history(messages)
+            updated_summary = summarize_history(recent_history)
             return message.content, recent_history, updated_summary
 
             
