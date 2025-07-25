@@ -200,6 +200,15 @@ fun LogMealTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        Text(
+            text = "Nutri-AI",
+            color = Color(0xFFE0004D),
+            fontWeight = FontWeight.Bold,
+            fontSize = 26.sp,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 12.dp)
+        )
         // Nutrition Summary Card
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -209,7 +218,7 @@ fun LogMealTab(
                 modifier = Modifier
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(Color(0xFFFFD876), Color(0xFFFF5E62))
+                            colors = listOf(Color(0xFFE0004D), Color(0xFFE0004D))
                         )
                     )
                     .padding(20.dp)
@@ -243,6 +252,13 @@ fun LogMealTab(
             }
         }
         Spacer(Modifier.height(18.dp))
+        Text(
+            text = "Add an image of your food to do analysis",
+            color = Color(0xFF222222),
+            fontWeight = FontWeight.Medium,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
 
         // Buttons for Log Meal and Rate Label (Camera + Gallery)
         Row(
@@ -261,28 +277,35 @@ fun LogMealTab(
                     cameraLauncher.launch(photoUri)
                 },
                 shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD876)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0004D)),
                 modifier = Modifier.weight(1f).height(56.dp),
                 enabled = cameraPermissionGranted && !isUploading
             ) {
                 Icon(Icons.Default.CameraAlt, contentDescription = "Log Meal (Camera)")
                 Spacer(Modifier.width(8.dp))
-                Text("Log Meal", fontWeight = FontWeight.Bold)
+                Text("Take Picture", fontWeight = FontWeight.Bold)
             }
             // Log Meal Gallery
             Button(
                 onClick = { galleryLauncher.launch("image/*") },
                 shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0C3FC)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0004D)),
                 modifier = Modifier.weight(1f).height(56.dp),
                 enabled = !isUploading
             ) {
                 Icon(Icons.Default.Photo, contentDescription = "Pick from Gallery")
                 Spacer(Modifier.width(8.dp))
-                Text("From Gallery", fontWeight = FontWeight.Bold)
+                Text("Upload From Gallery", fontWeight = FontWeight.Bold)
             }
         }
         Spacer(Modifier.height(10.dp))
+        Text(
+            text = "Add an image of nutrition label for analysis",
+            color = Color(0xFF222222),
+            fontWeight = FontWeight.Medium,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -299,25 +322,25 @@ fun LogMealTab(
                     labelCameraLauncher.launch(photoUri)
                 },
                 shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFa3ffd6)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0004D)),
                 modifier = Modifier.weight(1f).height(56.dp),
                 enabled = cameraPermissionGranted && !isUploading
             ) {
                 Icon(Icons.Default.CameraAlt, contentDescription = "Rate Label (Camera)")
                 Spacer(Modifier.width(8.dp))
-                Text("Rate Label", fontWeight = FontWeight.Bold)
+                Text("Take Picture", fontWeight = FontWeight.Bold)
             }
             // Rate Label Gallery
             Button(
                 onClick = { labelGalleryLauncher.launch("image/*") },
                 shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6AD3FF)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0004D)),
                 modifier = Modifier.weight(1f).height(56.dp),
                 enabled = !isUploading
             ) {
                 Icon(Icons.Default.Photo, contentDescription = "Label from Gallery")
                 Spacer(Modifier.width(8.dp))
-                Text("Label Gallery", fontWeight = FontWeight.Bold)
+                Text("Upload from Gallery", fontWeight = FontWeight.Bold)
             }
         }
 
@@ -535,9 +558,16 @@ suspend fun analyzeLabelApi(
 
         val rawResponse = response.body?.string() ?: return@withContext null
         Log.d("NUTRI_AI_DEBUG", "API Raw Response: $rawResponse")
-        val resp = JSONObject(rawResponse)
+        val outerJson = JSONObject(rawResponse)
+        val innerJsonString = outerJson.optString("response", null)
+        Log.d("NUTRI_AI_DEBUG", "Innen Json: $innerJsonString")
+        if (innerJsonString == null) {
+            // handle error
+            return@withContext null
+        }
+        val resp = JSONObject(innerJsonString)
 
-
+        Log.d("NUTRI_AI_DEBUG", "Response: $resp")
         return@withContext NutritionRatingResponse(
             rating = resp.optString("rating"),
             comment = resp.optString("comment"),

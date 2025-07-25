@@ -105,10 +105,10 @@ fun NutriChatScreen() {
                             Log.d("NUTRI_CHAT", "Calling sendChatRequest()")
                             val response = sendChatRequest(
                                 userInput = userInput,
-                                chatHistory = chatHistory,
-                                summary = summary,
+
                                 apiUrl = com.example.nutriai.data.ApiConfig.BASE_URL + "chat"
                             )
+                            Log.d("NUTRI_CHAT", "RawResponse ='$response'")
                             isLoading = false
                             if (response != null) {
                                 Log.d("NUTRI_CHAT", "Got response: '${response.general_response}'")
