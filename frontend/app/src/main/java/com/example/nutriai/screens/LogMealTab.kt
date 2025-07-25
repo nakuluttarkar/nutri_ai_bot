@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Environment
+import android.util.Log
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -396,48 +397,90 @@ suspend fun uploadAndAnalyzeMeal(
     imageUri: Uri,
     apiUrl: String
 ): NutritionSummary? = withContext(Dispatchers.IO) {
+    Log.d("NUTRI_AI_DEBUG", "Entered uploadAndAnalyzeMeal")
+
     try {
+        // Step 1: Open image stream
         val inputStream = context.contentResolver.openInputStream(imageUri)
-        val imageBytes = inputStream?.readBytes()
-        val imageBase64 = if (imageBytes != null) {
-            Base64.encodeToString(imageBytes, Base64.NO_WRAP)
-        } else return@withContext null
+        if (inputStream == null) {
+            Log.d("NUTRI_AI_DEBUG", "inputStream is null for uri: $imageUri")
+            return@withContext null
+        }
+        val mimeType = context.contentResolver.getType(imageUri)
+        Log.d("NUTRI_AI_DEBUG", "Selected image mimeType: $mimeType")
 
-        // Build request JSON
-        val jsonBody = JSONObject()
-        jsonBody.put("image_base64", imageBase64)
 
-        val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
+        // Step 2: Read bytes
+        val imageBytes = inputStream.readBytes()
+        Log.d("NUTRI_AI_DEBUG", "Read imageBytes, size: ${imageBytes.size}")
 
+        // Step 3: Encode to base64
+        val imageBase64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+        Log.d("NUTRI_AI_DEBUG", "Base64 string: ${imageBase64}")
+        Log.d("NUTRI_AI_DEBUG", "Base64 string created, length: ${imageBase64.length}")
+
+        // Step 4: Build request body (form-encoded)
+        val formBody = "$imageBase64"
+        val requestBody = formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType())
+
+        // Step 5: Create and send HTTP request
         val client = OkHttpClient()
         val request = Request.Builder()
             .url(apiUrl)
             .post(requestBody)
             .build()
+        Log.d("NUTRI_AI_DEBUG", "Sending POST request to $apiUrl")
 
         val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return@withContext null
+        if (!response.isSuccessful) {
+            Log.d("NUTRI_AI_DEBUG", "API call failed: ${response.code}")
+            return@withContext null
+        }
 
-        // Outer JSON
-        val rawResponse = response.body?.string() ?: return@withContext null
-        println("API Raw Response: $rawResponse") // <-- Add this
+        // Step 6: Get raw response
+        val rawResponse = response.body?.string()
+        Log.d("NUTRI_AI_DEBUG", "API Raw Response: $rawResponse")
+        if (rawResponse == null) {
+            Log.d("NUTRI_AI_DEBUG", "rawResponse is null")
+            return@withContext null
+        }
+
+        // Step 7: Parse response
         val outerJson = JSONObject(rawResponse)
+        val innerJsonString = outerJson.optString("response", null)
+        if (innerJsonString == null) {
+            Log.d("NUTRI_AI_DEBUG", "No 'response' key in API response")
+            return@withContext null
+        }
+        val innerJson = JSONObject(innerJsonString)
+        Log.d("NUTRI_AI_DEBUG", "Parsed innerJson: $innerJson")
 
-        // Parse the "response" field (inner JSON string)
-        val innerJson = JSONObject(outerJson.getString("response"))
+        // Step 8: Parse nutrition values
+        val nutritionEstimates = innerJson.optJSONObject("nutrition_estimates")
+        if (nutritionEstimates == null) {
+            Log.d("NUTRI_AI_DEBUG", "nutrition_estimates not found in response")
+            return@withContext null
+        }
 
-        // Parse values with sensible defaults if missing
+        val calories = nutritionEstimates.optString("calories")
+        val protein = nutritionEstimates.optString("protein")
+        val carbs = nutritionEstimates.optString("carbohydrates")
+        val fat = nutritionEstimates.optString("fat")
+        Log.d("NUTRI_AI_DEBUG", "Extracted: calories=$calories, protein=$protein, carbs=$carbs, fat=$fat")
+
+        // Step 9: Build and return summary
         return@withContext NutritionSummary(
-            calories = innerJson.optJSONObject("nutrition_estimates")?.optString("calories")?.replace(Regex("[^\\d]"), "")?.toIntOrNull() ?: 0,
-            caloriesTarget = 800, // Set user default/target as appropriate
-            protein = innerJson.optJSONObject("nutrition_estimates")?.optString("protein")?.replace(Regex("[^\\d]"), "")?.toIntOrNull() ?: 0,
-            proteinTarget = 70,    // Set user default/target
-            carbs = innerJson.optJSONObject("nutrition_estimates")?.optString("carbohydrates")?.replace(Regex("[^\\d]"), "")?.toIntOrNull() ?: 0,
-            carbsTarget = 200,     // Set user default/target
-            fats = innerJson.optJSONObject("nutrition_estimates")?.optString("fat")?.replace(Regex("[^\\d]"), "")?.toIntOrNull() ?: 0,
-            fatsTarget = 50        // Set user default/target
+            calories = calories.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
+            caloriesTarget = 800, // or user value
+            protein = protein.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
+            proteinTarget = 70,
+            carbs = carbs.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
+            carbsTarget = 200,
+            fats = fat.replace(Regex("[^\\d]"), "").toIntOrNull() ?: 0,
+            fatsTarget = 50
         )
     } catch (e: Exception) {
+        Log.d("NUTRI_AI_DEBUG", "Exception in uploadAndAnalyzeMeal: ${e.localizedMessage}")
         e.printStackTrace()
         return@withContext null
     }
@@ -460,11 +503,11 @@ suspend fun analyzeLabelApi(
             Base64.encodeToString(imageBytes, Base64.NO_WRAP)
         } else return@withContext null
 
-        val jsonBody = JSONObject().apply {
-            put("image_base64", imageBase64)
-            put("user_query", userQuery)
-        }
-        val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
+        // Try without encode if backend expects plain base64:
+        val formBody = "image_base64=$imageBase64"
+
+        val requestBody = formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType())
+
 
         val client = OkHttpClient()
         val request = Request.Builder()
@@ -476,7 +519,7 @@ suspend fun analyzeLabelApi(
         if (!response.isSuccessful) return@withContext null
 
         val rawResponse = response.body?.string() ?: return@withContext null
-        println("API Raw Response: $rawResponse") // <-- Add this
+        Log.d("NUTRI_AI_DEBUG", "API Raw Response: $rawResponse")
         val resp = JSONObject(rawResponse)
 
 
