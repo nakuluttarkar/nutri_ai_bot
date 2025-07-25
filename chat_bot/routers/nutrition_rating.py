@@ -8,13 +8,12 @@ router = APIRouter(prefix="/rate-label", tags=["Nutrition Rating"])
 
 @router.post("/")
 async def rate_label(
-    image_base64: str = Form(...),
-    user_query: str = Form(...)
+    image_base64: str = Form(...)
 ):
-    logger.info("🔍 Analyzing nutrition label for query: %s", user_query)
+    logger.info("🔍 Analyzing nutrition label for query: %s")
 
     try:
-        response = await rate_nutrition_label(image_base64, user_query)
+        response = await rate_nutrition_label(image_base64)
         logger.info("✅ Analysis complete.")
         return JSONResponse(content=response)
     except Exception as e:

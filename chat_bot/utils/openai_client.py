@@ -4,7 +4,7 @@ from fastapi import UploadFile
 
 client = OpenAI()
 
-async def analyze_food_image(image_base64: str, user_query):
+async def analyze_food_image(image_base64: str):
 
     response = client.chat.completions.create(
     model="gpt-4o",
@@ -45,7 +45,7 @@ async def analyze_food_image(image_base64: str, user_query):
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": user_query or "Analyze this baby food image."},
+                {"type": "text", "text": "Analyze this baby food image."},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
             ]
         }
@@ -55,7 +55,7 @@ async def analyze_food_image(image_base64: str, user_query):
     return {"response": response.choices[0].message.content}
 
 
-async def rate_nutrition_label(image_base64, user_query):
+async def rate_nutrition_label(image_base64):
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -66,7 +66,7 @@ async def rate_nutrition_label(image_base64, user_query):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": user_query or "Analyze this baby food label."},
+                    {"type": "text", "text":  "Analyze this baby food label."},
                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
                 ]
             }

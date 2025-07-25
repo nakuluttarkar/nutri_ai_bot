@@ -25,14 +25,18 @@ with tab1:
     st.header("📷 Upload Food Image")
     food_img = st.file_uploader("Upload food image", type=["jpg", "jpeg", "png"])
     if st.button("Analyze Food") and food_img:
-        res = requests.post(f"{API_URL}/analyze-food/", files={"image": food_img.getvalue()})
+        img_bytes = food_img.read()
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+        res = requests.post(f"{API_URL}/analyze-food/", data={"image_base64": img_base64})
         st.json(res.json())
 
 with tab2:
     st.header("📦 Upload Nutrition Label")
     label_img = st.file_uploader("Upload label image", type=["jpg", "jpeg", "png"])
     if st.button("Rate Label") and label_img:
-        res = requests.post(f"{API_URL}/rate-label/", files={"image": label_img.getvalue()})
+        img_bytes = food_img.read()
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+        res = requests.post(f"{API_URL}/rate-label/", data={"image_base64": img_base64})
         st.json(res.json())
 
 with tab3:
